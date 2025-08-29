@@ -1,0 +1,19 @@
+version: '3'
+
+vars:
+  CLI_NAME: "lokic"
+  BIN_DIR: "bin"
+
+includes:
+  common: ./build/taskfile.yaml
+  windows: ./build/windows/taskfile.yaml
+
+tasks:
+  build:
+    summary: Builds all applications
+    cmds:
+      - task: "{{OS}}:build"
+  
+  run:
+    cmds:
+      - task: "{{OS}}:run"

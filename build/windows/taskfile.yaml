@@ -1,0 +1,29 @@
+version: '3'
+
+includes:
+  common: ./../taskfile.yaml
+
+tasks:
+  build:
+    summary: Builds all applications for Windows
+    cmds:
+      - task: build:cli
+
+  build:cli:
+    summary: Builds the CLI application "lokic" for Windows
+    dir: "{{.CLI_NAME}}"
+    cmds:
+      - cmd: go build {{.BUILD_FLAGS}} -o ../{{.BIN_DIR}}/{{.CLI_NAME}}.exe
+    vars:
+      BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production -trimpath -buildvcs=false -ldflags="-w -s -H windowsgui"{{else}}-buildvcs=false -gcflags=all="-l"{{end}}'
+    env:
+      GOOS: windows
+      CGO_ENABLED: 0
+      GOARCH: '{{.ARCH | default ARCH}}'
+      PRODUCTION: '{{.PRODUCTION | default "false"}}'
+
+
+  run:
+    dir: "{{.BIN_DIR}}"
+    cmds:
+      - cmd: ./"{{.CLI_NAME}}.exe"
