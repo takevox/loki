@@ -4,16 +4,27 @@ includes:
   common: ./../taskfile.yaml
 
 tasks:
+  clean:
+    cmds:
+      - cmd: cmd /C del /S /Q {{.BIN_DIR}}
+      - cmd: cmd /C del /S /Q gen
   build:
     summary: Builds all applications for Windows
+    deps:
+      - task: "common:buf:generate"
+      - task: "common:mod:tidy"
     cmds:
+      - task: "build:plugins"
       - task: build:cli
 
   build:cli:
     summary: Builds the CLI application "lokic" for Windows
-    dir: "{{.CLI_NAME}}"
+    sources:
+      - app/lokic/**
+      - gen/**
+      - lib/**
     cmds:
-      - cmd: go build {{.BUILD_FLAGS}} -o ../{{.BIN_DIR}}/{{.CLI_NAME}}.exe
+      - cmd: go build {{.BUILD_FLAGS}} -o {{.BIN_DIR}}/{{.CLI_NAME}}.exe ./app/{{.CLI_NAME}}
     vars:
       BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production -trimpath -buildvcs=false -ldflags="-w -s -H windowsgui"{{else}}-buildvcs=false -gcflags=all="-l"{{end}}'
     env:
@@ -21,6 +32,27 @@ tasks:
       CGO_ENABLED: 0
       GOARCH: '{{.ARCH | default ARCH}}'
       PRODUCTION: '{{.PRODUCTION | default "false"}}'
+  
+  build:plugins:
+    cmds:
+      - task: "build:plugin:core"
+
+  build:plugin:core:
+    sources:
+      - plugins/core/**
+      - gen/**
+      - lib/**
+    cmds:
+      - cmd: go build {{.BUILD_FLAGS}} -o {{.BIN_DIR}}/plugins/core/core.plugin.exe ./plugins/core
+      - cmd: cmd /C copy /Y .\\plugins\\core\\plugin.windows.yaml .\\{{.BIN_DIR}}\\plugins\\core\\plugin.yaml
+    vars:
+      BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production -trimpath -buildvcs=false -ldflags="-w -s -H windowsgui"{{else}}-buildvcs=false -gcflags=all="-l"{{end}}'
+    env:
+      GOOS: windows
+      CGO_ENABLED: 0
+      GOARCH: '{{.ARCH | default ARCH}}'
+      PRODUCTION: '{{.PRODUCTION | default "false"}}'
+
 
 
   run:

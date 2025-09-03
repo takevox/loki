@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package loki.v1;
+
+option go_package = "github.com/takevox/loki/gen/loki/v1;lokiv1";
+
+// Any型
+message Any {
+    oneof raw {
+        string string = 1;
+        int64 numeric = 2;
+        Array array = 3;
+    }
+}
+
+// Any型の配列型
+message Array {
+    repeated Any any = 1;
+}
+
+// 名前付き型
+message NamedValue {
+    string name = 1;
+    repeated Any values = 2;
+}
+
+// ストリームパック型
+message StreamPack {
+    string node_id = 1;
+    string node_name = 2;
+    string function = 3;
+    bool ack = 4;
+    repeated NamedValue named_values = 5;
+}
+
+// フェーズハンドラリクエスト
+message HandlerRequest {
+    string node_id = 1;
+    string node_name = 2;
+    repeated NamedValue named_values = 3;
+}
+
+// フェーズハンドラレスポンス
+message HandlerResponse {
+    string node_id = 1;
+    string node_name = 2;
+    int32 error_code = 3;
+    repeated NamedValue named_values = 4;
+}
+
+service PluginService {
+    rpc Stream(StreamPack) returns (StreamPack);    
+    rpc Startup(HandlerRequest) returns (HandlerResponse);
+    rpc Shutdown(HandlerRequest) returns (HandlerResponse);
+    rpc PreProcess(HandlerRequest) returns (HandlerResponse);
+    rpc Process(HandlerRequest) returns (HandlerResponse);
+    rpc PostProcess(HandlerRequest) returns (HandlerResponse);
+}

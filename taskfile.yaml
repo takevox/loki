@@ -9,6 +9,10 @@ includes:
   windows: ./build/windows/taskfile.yaml
 
 tasks:
+  clean:
+    cmds:
+      - task: "{{OS}}:clean"
+
   build:
     summary: Builds all applications
     cmds:

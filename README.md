@@ -20,6 +20,7 @@ loki
 
 - go
 - go-task
+- buf
 
 
 # ビルド方法

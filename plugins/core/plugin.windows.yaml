@@ -1,0 +1,3 @@
+version: '1'
+plugin:
+  local: ./core.plugin.exe

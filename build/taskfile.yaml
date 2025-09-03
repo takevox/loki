@@ -1,1 +1,12 @@
 version: '3'
+
+tasks:
+  buf:generate:
+    sources:
+      - proto/**
+    cmds:
+      - cmd: buf generate
+  
+  mod:tidy:
+    cmds:
+      - cmd: go mod tidy

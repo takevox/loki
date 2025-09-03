@@ -1,0 +1,11 @@
+version: v2
+plugins:
+  # Go の protobuf 型（message/enum）生成
+  - remote: buf.build/protocolbuffers/go
+    out: gen
+    opt: paths=source_relative
+
+  # Connect-Go のクライアント＆サーバスタブ生成（gRPC / gRPC-Web / Connect 3プロトコル対応）
+  - remote: buf.build/connectrpc/go
+    out: gen
+    opt: paths=source_relative
