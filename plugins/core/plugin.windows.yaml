@@ -1,3 +1,3 @@
-version: '1'
+version: "1"
 plugin:
-  local: ./core.plugin.exe
+  local: "./core.plugin.exe"
