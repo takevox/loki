@@ -1,7 +1,8 @@
 package main
 
 import (
-	"log"
+	"fmt"
+	"log/slog"
 
 	"github.com/joho/godotenv"
 	"github.com/takevox/loki/app/lokic/config"
@@ -14,21 +15,28 @@ func main() {
 	)
 	err = godotenv.Load()
 	if err != nil {
-		log.Fatalln(err)
+		slog.Error(err.Error())
 	}
 	err = config.Load()
 	if err != nil {
-		log.Fatalln(err)
+		slog.Error(err.Error())
 	}
 
 	plugin_manager, err := lib.NewPluginManager(config.PLUGINS_DIR)
 	if err != nil {
-		log.Fatalln(err)
+		slog.Error(err.Error())
+	}
+
+	err = plugin_manager.LoadPlugins()
+	if err != nil {
+		slog.Error(err.Error())
+	}
+
+	err = plugin_manager.Initialize()
+	if err != nil {
+		slog.Error(err.Error())
 		return
 	}
 
-	plugin_manager.LoadPlugins()
-	plugin_manager.Startup()
-
-	log.Println("plugin_dir = ", plugin_manager.PluginDir)
+	slog.Debug(fmt.Sprintf("plugin_dir = %s", plugin_manager.PluginDir))
 }

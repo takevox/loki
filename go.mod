@@ -8,4 +8,4 @@ require (
 	google.golang.org/protobuf v1.36.8
 )
 
-require github.com/goccy/go-yaml v1.18.0 // indirect
+require github.com/goccy/go-yaml v1.18.0

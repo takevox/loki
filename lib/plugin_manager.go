@@ -1,14 +1,22 @@
 package lib
 
 import (
+	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
+	"connectrpc.com/connect"
 	"github.com/goccy/go-yaml"
+	lokiv1 "github.com/takevox/loki/gen/loki/v1"
+	"github.com/takevox/loki/gen/loki/v1/lokiv1connect"
 )
 
 type PluginConfig struct {
@@ -28,6 +36,8 @@ type PluginInfo struct {
 		Version string
 		Uri     string
 	}
+	HttpClient *http.Client
+	Client     lokiv1connect.PluginServiceClient
 }
 
 type PluginManager struct {
@@ -35,9 +45,9 @@ type PluginManager struct {
 	Plugins   []PluginInfo
 }
 
-func NewPluginManager(plugin_dir string) (*PluginManager, error) {
+func NewPluginManager(pluginDir string) (*PluginManager, error) {
 
-	abs_plugin_dir, err := filepath.Abs(plugin_dir)
+	abs_plugin_dir, err := filepath.Abs(pluginDir)
 	if err != nil {
 		return nil, err
 	}
@@ -61,18 +71,21 @@ func (pm *PluginManager) LoadPlugins() error {
 	return nil
 }
 
-func (pm *PluginManager) Startup() error {
+func (pm *PluginManager) Initialize() error {
 	for _, plugin_info := range pm.Plugins {
-		pm.startupPlugin(&plugin_info)
+		err := pm.initializePlugin(&plugin_info)
+		if err != nil {
+			log.Fatalln(err)
+		}
 	}
 	return nil
 }
 
-func (pm *PluginManager) loadPlugin(plugin_yaml_path string) error {
+func (pm *PluginManager) loadPlugin(pluginYamlPath string) error {
 	var plugin_info PluginInfo
 	var err error
 
-	yml, err := os.ReadFile(plugin_yaml_path)
+	yml, err := os.ReadFile(pluginYamlPath)
 	if err != nil {
 		return err
 	}
@@ -81,30 +94,62 @@ func (pm *PluginManager) loadPlugin(plugin_yaml_path string) error {
 		return err
 	}
 
-	plugin_info.DirPath, _ = filepath.Split(plugin_yaml_path)
+	plugin_info.DirPath, _ = filepath.Split(pluginYamlPath)
 
 	pm.Plugins = append(pm.Plugins, plugin_info)
 
 	return nil
 }
 
-func (pm *PluginManager) startupPlugin(plugin_info *PluginInfo) error {
+func (pm *PluginManager) initializePlugin(pluginInfo *PluginInfo) error {
 
 	var (
-		local_path string = plugin_info.Config.Plugin.Local
+		err        error
+		local_path string = pluginInfo.Config.Plugin.Local
 	)
 
 	if !filepath.IsAbs(local_path) {
-		local_path = filepath.Join(plugin_info.DirPath, local_path)
+		local_path = filepath.Join(pluginInfo.DirPath, local_path)
 	}
 
-	cmd := exec.Command(plugin_info.Config.Plugin.Local)
-	cmd.Dir = plugin_info.DirPath
+	cmd := exec.Command(local_path)
+	cmd.Dir = pluginInfo.DirPath
 
-	plugin_info.Stdin, _ = cmd.StdinPipe()
-	plugin_info.Stdout, _ = cmd.StdoutPipe()
+	pluginInfo.Stdin, _ = cmd.StdinPipe()
+	pluginInfo.Stdout, _ = cmd.StdoutPipe()
 
-	cmd
+	err = cmd.Start()
+	if err != nil {
+		return err
+	}
 
+	scanner := bufio.NewScanner(pluginInfo.Stdout)
+	scan_state := 0
+	for scanner.Scan() {
+		switch scan_state {
+		case 0:
+			pluginInfo.Meta.Version = scanner.Text()
+			scan_state = 1
+		case 1:
+			pluginInfo.Meta.Uri = scanner.Text()
+			scan_state = 2
+		}
+		if scan_state == 2 {
+			break
+		}
+	}
+	if scan_state != 2 {
+		return fmt.Errorf("起動情報の読み取りに失敗(%s)", local_path)
+	}
+
+	pluginInfo.HttpClient = &http.Client{Timeout: 30 * time.Second}
+	client := lokiv1connect.NewPluginServiceClient(pluginInfo.HttpClient, pluginInfo.Meta.Uri)
+
+	_, err = client.Initialize(context.Background(), connect.NewRequest(&lokiv1.InitializeRequest{}))
+	if err != nil {
+		return err
+	}
+
+	pluginInfo.Client = client
 	return nil
 }

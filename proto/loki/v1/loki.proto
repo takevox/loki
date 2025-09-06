@@ -48,7 +48,15 @@ message HandlerResponse {
     repeated NamedValue named_values = 4;
 }
 
+message InitializeRequest {}
+message InitializeResponse {}
+
+message GetNodeNameListRequest {}
+message GetNodeNameListResponse {}
+
 service PluginService {
+    rpc Initialize(InitializeRequest) returns (InitializeResponse);
+    rpc GetNodeNameList(GetNodeNameListRequest) returns (GetNodeNameListResponse);
     rpc Stream(StreamPack) returns (StreamPack);    
     rpc Startup(HandlerRequest) returns (HandlerResponse);
     rpc Shutdown(HandlerRequest) returns (HandlerResponse);
