@@ -6,10 +6,10 @@ var (
 	PLUGINS_DIR string = "./plugins"
 )
 
-func _GetEnv(key string, empty_value string) string {
+func _GetEnv(key string, emptyValue string) string {
 	value, eixsts := os.LookupEnv(key)
 	if !eixsts {
-		return empty_value
+		return emptyValue
 	}
 	return value
 }
