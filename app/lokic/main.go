@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 
 	"github.com/joho/godotenv"
@@ -32,11 +31,15 @@ func main() {
 		slog.Error(err.Error())
 	}
 
-	err = plugin_manager.Initialize()
+	err = plugin_manager.InitializePlugins()
 	if err != nil {
 		slog.Error(err.Error())
 		return
 	}
 
-	slog.Debug(fmt.Sprintf("plugin_dir = %s", plugin_manager.PluginDir))
+	err = plugin_manager.TerminatePlugins()
+	if err != nil {
+		slog.Error(err.Error())
+		return
+	}
 }

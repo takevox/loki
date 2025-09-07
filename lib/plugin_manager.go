@@ -6,17 +6,18 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/goccy/go-yaml"
-	lokiv1 "github.com/takevox/loki/gen/loki/v1"
 	"github.com/takevox/loki/gen/loki/v1/lokiv1connect"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 type PluginConfig struct {
@@ -33,16 +34,19 @@ type PluginInfo struct {
 	Stdin   io.WriteCloser
 	Stdout  io.ReadCloser
 	Meta    struct {
-		Version string
-		Uri     string
+		Version  string
+		Endpoint string
 	}
 	HttpClient *http.Client
 	Client     lokiv1connect.PluginServiceClient
+	Command    *exec.Cmd
+	Context    context.Context
+	Cancel     context.CancelFunc
 }
 
 type PluginManager struct {
 	PluginDir string
-	Plugins   []PluginInfo
+	Plugins   []*PluginInfo
 }
 
 func NewPluginManager(pluginDir string) (*PluginManager, error) {
@@ -71,19 +75,31 @@ func (pm *PluginManager) LoadPlugins() error {
 	return nil
 }
 
-func (pm *PluginManager) Initialize() error {
+func (pm *PluginManager) InitializePlugins() error {
 	for _, plugin_info := range pm.Plugins {
-		err := pm.initializePlugin(&plugin_info)
+		err := pm.initializePlugin(plugin_info)
 		if err != nil {
-			log.Fatalln(err)
+			slog.Error(err.Error())
+		}
+	}
+	return nil
+}
+
+func (pm *PluginManager) TerminatePlugins() error {
+	for _, plugin_info := range pm.Plugins {
+		err := pm.terminatePlugin(plugin_info)
+		if err != nil {
+			slog.Error(err.Error())
 		}
 	}
 	return nil
 }
 
 func (pm *PluginManager) loadPlugin(pluginYamlPath string) error {
-	var plugin_info PluginInfo
+	var plugin_info *PluginInfo
 	var err error
+
+	plugin_info = &PluginInfo{}
 
 	yml, err := os.ReadFile(pluginYamlPath)
 	if err != nil {
@@ -112,9 +128,15 @@ func (pm *PluginManager) initializePlugin(pluginInfo *PluginInfo) error {
 		local_path = filepath.Join(pluginInfo.DirPath, local_path)
 	}
 
-	cmd := exec.Command(local_path)
-	cmd.Dir = pluginInfo.DirPath
+	pluginInfo.Context, pluginInfo.Cancel = signal.NotifyContext(context.Background(), os.Interrupt)
 
+	cmd := exec.CommandContext(pluginInfo.Context, local_path)
+	cmd.Dir = pluginInfo.DirPath
+	cmd.Cancel = func() error {
+		return cmd.Process.Kill()
+	}
+
+	pluginInfo.Command = cmd
 	pluginInfo.Stdin, _ = cmd.StdinPipe()
 	pluginInfo.Stdout, _ = cmd.StdoutPipe()
 
@@ -131,7 +153,7 @@ func (pm *PluginManager) initializePlugin(pluginInfo *PluginInfo) error {
 			pluginInfo.Meta.Version = scanner.Text()
 			scan_state = 1
 		case 1:
-			pluginInfo.Meta.Uri = scanner.Text()
+			pluginInfo.Meta.Endpoint = scanner.Text()
 			scan_state = 2
 		}
 		if scan_state == 2 {
@@ -143,13 +165,21 @@ func (pm *PluginManager) initializePlugin(pluginInfo *PluginInfo) error {
 	}
 
 	pluginInfo.HttpClient = &http.Client{Timeout: 30 * time.Second}
-	client := lokiv1connect.NewPluginServiceClient(pluginInfo.HttpClient, pluginInfo.Meta.Uri)
+	client := lokiv1connect.NewPluginServiceClient(pluginInfo.HttpClient, pluginInfo.Meta.Endpoint)
 
-	_, err = client.Initialize(context.Background(), connect.NewRequest(&lokiv1.InitializeRequest{}))
+	_, err = client.Initialize(context.Background(), connect.NewRequest(&emptypb.Empty{}))
 	if err != nil {
 		return err
 	}
 
 	pluginInfo.Client = client
+	return nil
+}
+
+func (pm *PluginManager) terminatePlugin(pluginInfo *PluginInfo) error {
+	pluginInfo.Client.Terminate(context.Background(), connect.NewRequest(&emptypb.Empty{}))
+	pluginInfo.Cancel()
+	pluginInfo.Command.Process.Wait()
+
 	return nil
 }

@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "google/protobuf/empty.proto";
+
 package loki.v1;
 
 option go_package = "github.com/takevox/loki/gen/loki/v1;lokiv1";
@@ -18,10 +20,8 @@ message Array {
     repeated Any any = 1;
 }
 
-// 名前付き型
-message NamedValue {
-    string name = 1;
-    repeated Any values = 2;
+message StringArray {
+    repeated string name = 1;
 }
 
 // ストリームパック型
@@ -30,14 +30,14 @@ message StreamPack {
     string node_name = 2;
     string function = 3;
     bool ack = 4;
-    repeated NamedValue named_values = 5;
+    map<string, Any> properties = 5;
 }
 
 // フェーズハンドラリクエスト
 message HandlerRequest {
     string node_id = 1;
     string node_name = 2;
-    repeated NamedValue named_values = 3;
+    map<string, Any> properties = 3;
 }
 
 // フェーズハンドラレスポンス
@@ -45,19 +45,14 @@ message HandlerResponse {
     string node_id = 1;
     string node_name = 2;
     int32 error_code = 3;
-    repeated NamedValue named_values = 4;
+    map<string, Any> properties = 4;
 }
 
-message InitializeRequest {}
-message InitializeResponse {}
-
-message GetNodeNameListRequest {}
-message GetNodeNameListResponse {}
-
 service PluginService {
-    rpc Initialize(InitializeRequest) returns (InitializeResponse);
-    rpc GetNodeNameList(GetNodeNameListRequest) returns (GetNodeNameListResponse);
-    rpc Stream(StreamPack) returns (StreamPack);    
+    rpc Initialize(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc Terminate(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc GetNodeNameList(google.protobuf.Empty) returns (StringArray);
+    rpc Stream(StreamPack) returns (StreamPack);
     rpc Startup(HandlerRequest) returns (HandlerResponse);
     rpc Shutdown(HandlerRequest) returns (HandlerResponse);
     rpc PreProcess(HandlerRequest) returns (HandlerResponse);
