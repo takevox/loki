@@ -11,13 +11,11 @@ import (
 type PluginServer struct{}
 
 func (s *PluginServer) Initialize(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error) {
-	res := &emptypb.Empty{}
-	return connect.NewResponse(res), nil
+	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
 func (s *PluginServer) Terminate(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error) {
-	res := &emptypb.Empty{}
-	return connect.NewResponse(res), nil
+	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
 func (s *PluginServer) GetNodeNameList(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[lokiv1.StringArray], error) {

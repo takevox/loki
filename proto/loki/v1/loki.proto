@@ -21,7 +21,7 @@ message Array {
 }
 
 message StringArray {
-    repeated string name = 1;
+    repeated string values = 1;
 }
 
 // ストリームパック型
